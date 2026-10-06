@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CampusFix</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<section id="auth" class="hide">
+  <div class="hero">
+    <h1>Spot it.<br>Report it.<br><span>Fixed fast.</span></h1>
+    <p>One place for every broken light, slow Wi-Fi and leaking tap on campus. Vote, track and get it resolved.</p>
+    <div class="track"><span>Open</span><span>In progress</span><span>Resolved</span><span>Closed</span></div>
+    <div class="mock">
+      <div class="mc" style="--c:var(--urgent)"><div><i></i>Projector flickering in Room 204</div><small>Urgent · 14 students agree</small></div>
+      <div class="mc" style="--c:var(--medium)"><div><i></i>Hostel Wi-Fi drops every evening</div><small>In progress · assigned to Rafi</small></div>
+      <div class="mc" style="--c:#2fd18a"><div><i></i>Water cooler fixed near library</div><small>Resolved just now</small></div>
+    </div>
+  </div>
+  <div class="formwrap"><div class="panel">
+    <div class="tabs"><button id="tLogin" class="on">Log in</button><button id="tReg">Create account</button></div>
+    <form id="fLogin">
+      <label>Email</label><input name="email" type="email" required autocomplete="username">
+      <label>Password</label><input name="password" type="password" required minlength="6" autocomplete="current-password">
+      <label>I am a</label><select name="role"><option>student</option><option>staff</option><option>faculty</option><option>admin</option></select>
+      <div class="row"><button class="btn p" style="flex:1">Log in</button></div>
+    </form>
+    <form id="fReg" class="hide">
+      <label>Full name</label><input name="name" required>
+      <label>Email</label><input name="email" type="email" required>
+      <label>Password (6-72 characters)</label><input name="password" type="password" required minlength="6" maxlength="72">
+      <label>Role</label><select name="role"><option>student</option><option>staff</option><option>faculty</option><option>admin</option></select>
+      <div class="row"><button class="btn p" style="flex:1">Create account</button></div>
+    </form>
+  </div></div>
+</section>
+
+<section id="app" class="hide">
+  <header>
+    <div class="logo">Campus<b>Fix</b></div>
+    <span class="who" id="who"></span><span class="av" id="av"></span>
+    <button class="btn" id="theme" aria-label="Toggle theme">&#9680;</button>
+    <button class="btn p hide" id="newBtn">Report an issue</button>
+    <button class="btn" id="out">Log out</button>
+  </header>
+  <main>
+    <div class="stats" id="stats"></div>
+    <div class="filters">
+      <input id="q" type="search" placeholder="Search title or description">
+      <select id="fPri"><option value="">Any priority</option></select>
+      <select id="fCat"><option value="">Any category</option></select>
+    </div>
+    <div class="list" id="list"></div>
+    <div class="pager"><button class="btn" id="prev">Previous</button><span id="pinfo"></span><button class="btn" id="next">Next</button></div>
+  </main>
+</section>
+
+<div id="layer"></div><div id="toasts"></div>
+
+<!-- Classic scripts, loaded in order (no ES modules, so no MIME-type surprises) -->
+<script src="js/config.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/api.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/detail.js"></script>
+<script src="js/issues.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>

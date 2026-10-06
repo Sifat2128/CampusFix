@@ -1,0 +1,555 @@
+const API = location.origin;
+const $ = (s) => document.querySelector(s);
+const $$ = (s) => Array.from(document.querySelectorAll(s));
+
+/* ---------- state ---------- */
+const state = {
+  token: localStorage.getItem("cf_token"),
+  email: localStorage.getItem("cf_email"),
+  user: JSON.parse(localStorage.getItem("cf_user") || "null"),
+  current: null,
+  editing: false,
+};
+/* per-account cache of issues the user has opened, so switching accounts never leaks data */
+const issueKey = () => `cf_issues:${state.email || "anon"}`;
+const readCache = () => JSON.parse(localStorage.getItem(issueKey()) || "{}");
+const writeCache = (o) => localStorage.setItem(issueKey(), JSON.stringify(o));
+
+/* The API identifies people by *name* only (Issue.user / Issue.assigned_employee
+   are strings, never ids), and POST /auth/login returns nothing but a token.
+   So we remember the display name + role per account on this device; otherwise
+   we can't tell whether the logged-in account owns an issue. */
+const profileBook = JSON.parse(localStorage.getItem("cf_roles") || "{}");
+function rememberProfile(email, patch) {
+  if (!email || !patch) return;
+  profileBook[email] = { ...(profileBook[email] || {}), ...patch };
+  localStorage.setItem("cf_roles", JSON.stringify(profileBook));
+}
+const profileFor = (email) => profileBook[email] || {};
+
+/* ---------- api ---------- */
+/* Distinguishes a transport failure from an HTTP error.
+   Only fetch() itself can throw here; every HTTP response is handled after it resolves. */
+async function api(method, path, body, form = false) {
+  const headers = {};
+  if (state.token) headers.Authorization = `Bearer ${state.token}`;
+  let payload;
+  if (body && form) {
+    payload = new URLSearchParams(body);
+    headers["Content-Type"] = "application/x-www-form-urlencoded";
+  } else if (body) {
+    payload = JSON.stringify(body);
+    headers["Content-Type"] = "application/json";
+  }
+
+  const t0 = performance.now();
+  let res;
+  try {
+    res = await fetch(API + path, { method, headers, body: payload });
+  } catch (e) {
+    log(method, path, "NET", String(e), false, 0);
+    throw new Error("Can't reach the server — is it running on this port?");
+  }
+
+  const txt = await res.text();
+  let data = null;
+  if (txt) {
+    try { data = JSON.parse(txt); } catch { data = txt; }
+  }
+  const ms = Math.round(performance.now() - t0);
+  log(method, path, res.status, data, res.ok, ms);
+
+  if (!res.ok) {
+    if (res.status === 401 && state.token) {
+      forceLogout("Session expired — please log in again.");
+    }
+    throw new Error(readDetail(data, res.status));
+  }
+  return data;
+}
+
+/* turn FastAPI's detail (string | validation array) into one readable line */
+function readDetail(data, status) {
+  const d = data && data.detail;
+  if (typeof d === "string") return d;
+  if (Array.isArray(d)) {
+    return d.map((x) => `${(x.loc || []).slice(1).join(".") || "body"}: ${x.msg || "invalid"}`).join("; ");
+  }
+  if (d) return JSON.stringify(d);
+  if (data && !d && typeof data === "object" && !("detail" in data)) return "HTTP " + status;
+  return `Request failed (HTTP ${status})`;
+}
+
+/* ---------- console / toast ---------- */
+function log(m, path, code, body, ok, ms) {
+  const ul = $("#logList");
+  if (!ul) return;
+  const li = document.createElement("li");
+  li.className = ok ? "ok" : "err";
+  li.innerHTML = `<span class="m"></span><span class="p"></span><span class="code"></span><div class="body"></div>`;
+  li.querySelector(".m").textContent = m;
+  li.querySelector(".p").textContent = path;
+  li.querySelector(".code").textContent = `${code}${ms ? " · " + ms + "ms" : ""}`;
+  li.querySelector(".body").textContent =
+    body == null ? "" : typeof body === "string" ? body : JSON.stringify(body);
+  ul.prepend(li);
+  while (ul.children.length > 60) ul.lastElementChild.remove();
+}
+
+function toast(msg, ok = true) {
+  const el = document.createElement("div");
+  el.className = `toast ${ok ? "ok" : "err"}`;
+  el.textContent = (ok ? "✓ " : "✕ ") + msg;
+  $("#toasts").append(el);
+  setTimeout(() => el.remove(), 4000);
+}
+
+async function run(btn, fn) {
+  if (btn) {
+    btn.disabled = true;
+    btn.classList.add("loading");
+  }
+  try {
+    return await fn();
+  } catch (e) {
+    toast(e.message, false);
+  } finally {
+    if (btn) {
+      btn.classList.remove("loading");
+      /* Don't just re-enable: action buttons are permission-gated, so re-derive
+         their state from the issue (the request may have changed its status). */
+      if (state.current) applyPermissions(state.current);
+      else btn.disabled = false;
+    }
+  }
+}
+
+/* ---------- auth ---------- */
+$$(".tab").forEach((t) => (t.onclick = () => {
+  $$(".tab").forEach((x) => x.classList.toggle("active", x === t));
+  const reg = t.dataset.tab === "register";
+  $(".tabs").classList.toggle("reg", reg);
+  $("#loginForm").hidden = reg;
+  $("#registerForm").hidden = !reg;
+}));
+
+/* role pickers just move the .active class; the value is read back from the DOM on submit */
+function wireRoles(container) {
+  container.querySelectorAll(".role").forEach((r) => {
+    r.onclick = () => container.querySelectorAll(".role").forEach((x) => x.classList.toggle("active", x === r));
+  });
+}
+const activeRole = (container) => container.querySelector(".role.active")?.dataset.role || "student";
+
+wireRoles($("#regRoles"));
+wireRoles($("#rolePick"));
+
+$("#registerForm").onsubmit = (e) => {
+  e.preventDefault();
+  run($("#registerBtn"), async () => {
+    const name = $("#regName").value.trim();
+    const email = $("#regEmail").value.trim().toLowerCase();
+    const password = $("#regPassword").value;
+    const role = activeRole($("#regRoles"));
+    const u = await api("POST", "/auth/register", { name, email, password, role });
+    const known = { name: u.name || name, email, role: u.role || role };
+    rememberProfile(email, known);
+    toast(`Welcome aboard, ${u.name}!`);
+    await establishSession(email, password, known);
+  });
+};
+
+$("#loginForm").onsubmit = (e) => {
+  e.preventDefault();
+  run($("#loginBtn"), async () => {
+    const email = $("#loginEmail").value.trim().toLowerCase();
+    await establishSession(email, $("#loginPassword").value);
+  });
+};
+
+/* Exchanges credentials for a token. `knownUser` is only supplied right after
+   registration, where the API hands back the real name and role; otherwise we
+   fall back to what we remembered, and ask once if we've never seen the account. */
+async function establishSession(email, password, knownUser) {
+  const tok = await api("POST", "/auth/login", { username: email, password }, true);
+  state.token = tok.access_token;
+  state.email = email;
+
+  if (knownUser) {
+    state.user = knownUser;
+  } else {
+    const saved = profileFor(email);
+    if (saved.role && saved.name) {
+      state.user = { name: saved.name, email, role: saved.role };
+    } else {
+      state.user = await askProfile(email);
+    }
+  }
+  persist();
+  enterDash();
+  toast(`Logged in as ${state.user.role}`);
+}
+
+function persist() {
+  if (state.token) {
+    localStorage.setItem("cf_token", state.token);
+    localStorage.setItem("cf_email", state.email);
+    localStorage.setItem("cf_user", JSON.stringify(state.user));
+  } else {
+    localStorage.removeItem("cf_token");
+    localStorage.removeItem("cf_email");
+    localStorage.removeItem("cf_user");
+  }
+}
+
+function askProfile(email) {
+  return new Promise((resolve) => {
+    const dlg = $("#roleModal");
+    const done = () => {
+      const name = $("#profileName").value.trim();
+      const role = activeRole($("#rolePick"));
+      rememberProfile(email, { role, ...(name ? { name } : {}) });
+      dlg.close();
+      resolve({ email, role, name: name || email.split("@")[0] });
+    };
+    $("#roleConfirm").onclick = done;
+    dlg.oncancel = (ev) => { ev.preventDefault(); done(); };
+    dlg.showModal();
+    $("#profileName").focus();
+  });
+}
+
+function forceLogout(msg) {
+  state.token = null;
+  state.user = null;
+  persist();
+  show();
+  if (msg) toast(msg, false);
+}
+
+$("#logoutBtn").onclick = () => {
+  state.token = null;
+  state.user = null;
+  state.current = null;
+  persist();
+  show();
+};
+
+/* ---------- routing ---------- */
+function show() {
+  const authed = !!state.token;
+  $("#authView").hidden = authed;
+  $("#dashView").hidden = !authed;
+  $("#userChip").hidden = !authed;
+  if (authed) enterDash();
+}
+
+function enterDash() {
+  $("#authView").hidden = true;
+  $("#dashView").hidden = false;
+  $("#userChip").hidden = false;
+  const u = state.user || {};
+  $("#userName").textContent = u.name || u.email || "User";
+  $("#userRole").textContent = u.role || "unknown";
+  $("#userAvatar").textContent = ((u.name || u.email || "U")[0] || "U").toUpperCase();
+  $("#listTitle").textContent = u.role === "staff" ? "Issues assigned to me" : "Issues I opened";
+  // only students may report issues — the API rejects everyone else with 403
+  $("#newIssueBtn").hidden = u.role !== "student";
+  renderList();
+}
+
+/* ---------- issue list (local cache only — no list endpoint exists) ---------- */
+function renderList() {
+  const ul = $("#issueList");
+  ul.innerHTML = "";
+  const items = Object.values(readCache()).sort((a, b) => b.id - a.id);
+  if (!items.length) {
+    const li = document.createElement("li");
+    li.className = "muted empty-row";
+    li.textContent = state.user?.role === "student"
+      ? "Nothing tracked yet — report an issue or open one by number."
+      : "Nothing tracked yet — open an issue you were assigned by number.";
+    ul.append(li);
+    return;
+  }
+  items.forEach((i) => {
+    const li = document.createElement("li");
+    li.className = state.current?.id === i.id ? "active" : "";
+    const t = document.createElement("span");
+    t.className = "t";
+    t.textContent = `#${i.id} ${i.title}`;
+    const b = document.createElement("span");
+    b.className = `badge s-${i.status || "open"}`;
+    b.textContent = pretty(i.status);
+    li.append(t, b);
+    li.onclick = () => openIssue(i.id, li);
+    ul.append(li);
+  });
+}
+
+function track(issue) {
+  const cache = readCache();
+  cache[issue.id] = { id: issue.id, title: issue.title, status: issue.status };
+  writeCache(cache);
+  renderList();
+}
+
+/* ---------- formatting (null-safe) ---------- */
+const pretty = (v) => (v == null ? "—" : String(v).replace(/_/g, " "));
+const cap = (v) => (v == null || v === "" ? "—" : String(v).charAt(0).toUpperCase() + String(v).slice(1));
+const ORDER = ["open", "in_progress", "resolved", "closed"];
+
+/* ---------- issue detail ---------- */
+async function openIssue(id, btn) {
+  const clean = parseInt(id, 10);
+  if (!Number.isInteger(clean) || clean < 1) {
+    toast("Enter a valid issue number", false);
+    return;
+  }
+  return run(btn, async () => {
+    const issue = await api("GET", `/issues/${clean}`);
+    state.current = issue;
+    track(issue);
+    renderIssue();
+    loadComments();
+  });
+}
+
+function renderIssue() {
+  const i = state.current;
+  $("#emptyState").hidden = true;
+  $("#issueDetail").hidden = false;
+  $("#issueDetail").style.animation = "none";
+  void $("#issueDetail").offsetWidth;
+  $("#issueDetail").style.animation = "";
+
+  $("#dId").textContent = `#${i.id}`;
+  $("#dTitle").textContent = i.title ?? "(untitled)";
+  $("#dDesc").textContent = i.description ?? "";
+  $("#dStatus").textContent = pretty(i.status);
+  $("#dStatus").className = `badge s-${i.status || "open"}`;
+
+  $("#dCategory").textContent = "🏷 " + pretty(i.category);
+  $("#dCategory").className = "chip";
+  $("#dPriority").textContent = "⚑ " + cap(i.priority);
+  $("#dPriority").className = `chip p-${i.priority || "low"}`;
+
+  $("#dUser").textContent = i.user ?? "—";
+  $("#dStaff").textContent = i.assigned_employee ?? "—";
+  $("#dCreated").textContent = i.created_at ? new Date(i.created_at).toLocaleString() : "—";
+
+  const idx = ORDER.indexOf(i.status);
+  $$(".step").forEach((s, n) => {
+    s.classList.toggle("done", idx >= 0 && n <= idx);
+    s.classList.toggle("current", n === idx);
+  });
+
+  applyPermissions(i);
+  renderList();
+}
+
+/* Gates mirror what the API enforces, so the buttons never lie.
+   The API only tells us *names*, so if we don't know our display name we can't
+   prove ownership — in that case we enable what the role allows and let the
+   server be the judge (its 403 message is surfaced verbatim). */
+function applyPermissions(i) {
+  const role = state.user?.role;
+  const status = i.status;
+  const me = (state.user?.name || "").trim();
+  const knowWho = me.length > 0;
+  const iAmOwner = knowWho && i.user === me;
+  const iAmStaff = knowWho && i.assigned_employee === me;
+  /* deny() -> should this control be disabled?
+   allow() -> is this action permitted?
+   Both fall back to "let the server decide" when we can't prove who we are. */
+  const deny = (permitted) => (knowWho ? !permitted : false);
+  const allow = (permitted) => (knowWho ? permitted : true);
+
+  // start / resolve — the API requires the assigned staff member
+  $("#startBtn").disabled =
+    role !== "staff" ? true : deny(iAmStaff && status === "open");
+  $("#resolveBtn").disabled =
+    role !== "staff" ? true : deny(iAmStaff && (status === "open" || status === "in_progress"));
+  // close — the API requires the student who opened it
+  $("#closeBtn").disabled =
+    role !== "student" ? true : deny(iAmOwner && status === "resolved");
+  // edit — admins any time; the owning student only while it is still open
+  $("#editBtn").disabled =
+    role === "admin" ? false : role === "student" ? deny(iAmOwner && status === "open") : true;
+
+  // comments — owner or assignee only, and faculty are rejected outright
+  const canComment = role === "faculty" ? false : allow(iAmOwner || iAmStaff);
+  $("#commentForm").hidden = !canComment;
+  $("#commentNote").hidden = canComment;
+  if (!canComment) {
+    $("#commentNote").textContent =
+      role === "faculty"
+        ? "Faculty accounts cannot comment on this API."
+        : "You can read this thread but not post — only the issue owner or the assigned staff member can comment.";
+  }
+}
+
+async function loadComments() {
+  const ul = $("#commentList");
+  const id = state.current?.id;
+  ul.innerHTML = `<li class="muted">Loading…</li>`;
+  try {
+    const list = await api("GET", `/issues/${id}/comments`);
+    if (state.current?.id !== id) return;
+    ul.innerHTML = "";
+    if (!list || !list.length) {
+      const li = document.createElement("li");
+      li.className = "muted";
+      li.textContent = "No comments yet — start the conversation.";
+      ul.append(li);
+      return;
+    }
+    list.forEach((c) => {
+      const li = document.createElement("li");
+      const meta = document.createElement("div");
+      meta.className = "meta";
+      const who = document.createElement("b");
+      who.textContent = c.user_info?.name || "User";
+      const when = document.createElement("span");
+      when.textContent = c.created_at ? new Date(c.created_at).toLocaleString() : "";
+      meta.append(who, when);
+      const body = document.createElement("div");
+      body.className = "c";
+      body.textContent = c.content;
+      li.append(meta, body);
+      ul.append(li);
+    });
+  } catch (e) {
+    if (state.current?.id !== id) return;
+    ul.innerHTML = "";
+    const li = document.createElement("li");
+    li.className = "muted";
+    li.textContent = "Couldn't load comments: " + e.message;
+    ul.append(li);
+  }
+}
+
+/* ---------- status transitions ---------- */
+async function transition(path, btn, msg) {
+  const id = state.current?.id;
+  if (!id) return;
+  return run(btn, async () => {
+    await api("POST", `/issues/${id}/${path}`);
+    toast(msg);
+    await openIssue(id);
+  });
+}
+
+$("#startBtn").onclick = (e) => transition("start", e.currentTarget, "Work started");
+$("#resolveBtn").onclick = (e) => transition("resolve", e.currentTarget, "Status advanced");
+$("#closeBtn").onclick = (e) => transition("close", e.currentTarget, "Issue closed");
+$("#refreshBtn").onclick = (e) => openIssue(state.current.id, e.currentTarget);
+
+$("#lookupForm").onsubmit = (e) => {
+  e.preventDefault();
+  openIssue($("#lookupId").value, $("#lookupBtn"));
+};
+
+$("#commentForm").onsubmit = (e) => {
+  e.preventDefault();
+  const id = state.current?.id;
+  run($("#commentBtn"), async () => {
+    await api("POST", `/issues/${id}/comments`, { content: $("#commentInput").value.trim() });
+    $("#commentInput").value = "";
+    toast("Comment posted");
+    loadComments();
+  });
+};
+
+/* ---------- create / edit ---------- */
+const modal = $("#issueModal");
+
+function openModal(edit) {
+  state.editing = edit;
+  $("#modalTitle").textContent = edit ? `Edit issue #${state.current.id}` : "Report Issue";
+  const i = edit
+    ? state.current
+    : { title: "", description: "", category: "electricity", priority: "medium" };
+  $("#fTitle").value = i.title ?? "";
+  $("#fDesc").value = i.description ?? "";
+  $("#fCategory").value = i.category ?? "other";
+  $("#fPriority").value = i.priority ?? "medium";
+  modal.showModal();
+  $("#fTitle").focus();
+}
+
+$("#newIssueBtn").onclick = () => openModal(false);
+$("#editBtn").onclick = () => openModal(true);
+$("#cancelModal").onclick = () => modal.close();
+
+$("#issueForm").onsubmit = (e) => {
+  e.preventDefault();
+  const body = {
+    title: $("#fTitle").value.trim(),
+    description: $("#fDesc").value.trim(),
+    category: $("#fCategory").value,
+    priority: $("#fPriority").value,
+  };
+  if (!body.title || !body.description) {
+    toast("Title and description are required", false);
+    return;
+  }
+  run($("#submitIssue"), async () => {
+    const created = state.editing
+      ? await api("PATCH", `/issues/${state.current.id}`, body)
+      : await api("POST", "/issues/create", body);
+    modal.close();
+    toast(state.editing ? "Issue updated" : `Issue #${created.id} created`);
+    await openIssue(created.id);
+  });
+};
+
+/* ---------- health check ---------- */
+$("#runAllBtn").onclick = (e) => run(e.currentTarget, async () => {
+  const probes = [["GET", "/"], ["GET", "/openapi.json"], ["GET", "/issues/999999"]];
+  if (state.current) {
+    probes.push(["GET", `/issues/${state.current.id}`], ["GET", `/issues/${state.current.id}/comments`]);
+  }
+  let ok = 0;
+  const failures = [];
+  for (const [m, p] of probes) {
+    try {
+      await api(m, p);
+      ok++;
+    } catch (e) {
+      failures.push(`${p} (${e.message})`);
+    }
+  }
+  toast(`${ok}/${probes.length} reachable`, ok === probes.length);
+  if (failures.length) console.warn("Health check failures:", failures);
+});
+
+$("#clearLogBtn").onclick = () => ($("#logList").innerHTML = "");
+$("#clearStorageBtn").onclick = () => {
+  localStorage.clear();
+  location.reload();
+};
+
+/* ---------- shortcuts ---------- */
+document.addEventListener("keydown", (e) => {
+  const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName);
+  if (e.key === "Escape" && modal.open) {
+    modal.close();
+    return;
+  }
+  if (typing) return;
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
+    e.preventDefault();
+    $("#lookupId").focus();
+  }
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "n" && state.user?.role === "student") {
+    e.preventDefault();
+    openModal(false);
+  }
+  if (e.key === "/" && !$("#dashView").hidden) {
+    e.preventDefault();
+    $("#lookupId").focus();
+  }
+});
+
+show();

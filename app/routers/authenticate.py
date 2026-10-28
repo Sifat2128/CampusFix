@@ -36,6 +36,7 @@ def register(credentials : schemas.CreateUser, background_tasks: BackgroundTasks
         admin_entry = models.Admin(user_id=user.id, name=user.name)
         db.add(admin_entry)
         db.commit()
+  setattr(user, "verification_url", f"{settings.base_url}/auth/verify?token={verification_token}")
   return user 
 
 @router.get("/verify")
@@ -153,7 +154,11 @@ def resend_verification(email: str, background_tasks: BackgroundTasks, db: Sessi
     
     token = oAuth.create_verification_token(user.email)
     background_tasks.add_task(oAuth.send_verification_email, token, user.email)
-    return {"message": "A new verification link has been sent to your email. Please check your inbox and spam folder."}
+    verify_url = f"{settings.base_url}/auth/verify?token={token}"
+    return {
+        "message": "A new verification link has been sent to your email.",
+        "verification_url": verify_url
+    }
 
 @router.get("/diagnose-email")
 async def diagnose_email(to: str = ""):

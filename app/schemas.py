@@ -16,6 +16,7 @@ class GetUser(BaseModel):
     role:UserRole
     created_at:datetime
     is_verified:bool = False
+    verification_url: Optional[str] = None
     model_config = ConfigDict(from_attributes=True)
 class TokenId(BaseModel):
     user_id:int 

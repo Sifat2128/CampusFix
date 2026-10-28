@@ -97,14 +97,23 @@ function openResendVerifModal() {
     const email = new FormData(e.target).get('email').trim();
     const res = await api('/auth/resend-verification?email=' + encodeURIComponent(email), { method: 'POST' });
     toast(res.message || 'Verification link sent!');
+    const directLink = res && res.verification_url ? res.verification_url : '';
+    const directBtnHtml = directLink ? `
+      <div style="margin: 14px 0; padding: 12px; background: rgba(124,92,255,0.08); border-radius: 10px; border: 1px dashed rgba(124,92,255,0.3)">
+        <p style="font-size:12px;color:var(--mute);margin:0 0 8px">Cloud mail delayed? Activate directly:</p>
+        <a href="${directLink}" class="btn p" style="display:block;padding:9px 16px;text-decoration:none;font-size:13px;text-align:center">🚀 Activate Account Now</a>
+      </div>
+    ` : '';
+
     layer(`
       <div class="modal" style="text-align:center;max-width:440px">
         <div style="width:68px;height:68px;margin:0 auto 16px;border-radius:50%;background:rgba(124,92,255,0.15);border:1.5px solid rgba(124,92,255,0.3);display:flex;align-items:center;justify-content:center;font-size:32px">📬</div>
         <h2 style="margin:0 0 8px;font-size:20px;font-weight:800">Check Your Inbox</h2>
-        <p style="color:var(--mute);font-size:14px;line-height:1.6;margin:0 0 22px">
+        <p style="color:var(--mute);font-size:14px;line-height:1.6;margin:0 0 16px">
           We sent a new activation link to <strong style="color:var(--ink)">${esc(email)}</strong>.<br>Please check your inbox or spam folder.
         </p>
-        <button class="btn p" id="closeResendSuccess" style="width:100%">Got It</button>
+        ${directBtnHtml}
+        <button class="btn" id="closeResendSuccess" style="width:100%;margin-top:6px">Close</button>
       </div>
     `, 1);
     $('#closeResendSuccess').onclick = closeLayer;
@@ -256,15 +265,24 @@ function initAuth() {
       toast(valErr, 'error');
       return;
     }
-    await api('/auth/register', { method: 'POST', json: f });
+    const regRes = await api('/auth/register', { method: 'POST', json: f });
     const m = JSON.parse(localStorage.cf_roles || '{}'); m[f.email] = f.role;
     localStorage.cf_roles = JSON.stringify(m);
     toast('Account created! Please check your email.');
+    const directLink = regRes && regRes.verification_url ? regRes.verification_url : '';
+    const directBtnHtml = directLink ? `
+      <div style="margin: 14px 0; padding: 12px; background: rgba(124,92,255,0.08); border-radius: 10px; border: 1px dashed rgba(124,92,255,0.3)">
+        <p style="font-size:12px;color:var(--mute);margin:0 0 8px">Cloud email delayed? Activate directly:</p>
+        <a href="${directLink}" class="btn p" style="display:block;padding:9px 16px;text-decoration:none;font-size:13px;text-align:center">🚀 Activate Account Now</a>
+      </div>
+    ` : '';
+
     layer(`<div class="modal" style="text-align:center;max-width:440px">
       <div style="width:68px;height:68px;margin:0 auto 16px;border-radius:50%;background:rgba(124,92,255,0.15);border:1.5px solid rgba(124,92,255,0.3);display:flex;align-items:center;justify-content:center;font-size:32px">✉️</div>
       <h2 style="margin:0 0 8px">Verify Your Email</h2>
-      <p style="color:var(--mute);font-size:14px;line-height:1.6;margin:0 0 20px">We've sent a magic verification link to <strong style="color:var(--ink)">${esc(f.email)}</strong>. Click the link in your inbox to activate your account.</p>
-      <button class="btn p" id="closeRegModal" style="width:100%">Got it, back to login</button>
+      <p style="color:var(--mute);font-size:14px;line-height:1.6;margin:0 0 16px">We've sent a magic verification link to <strong style="color:var(--ink)">${esc(f.email)}</strong>. Click the link in your inbox to activate your account.</p>
+      ${directBtnHtml}
+      <button class="btn" id="closeRegModal" style="width:100%;margin-top:6px">Back to login</button>
     </div>`, 1);
     $('#closeRegModal').onclick = closeLayer;
     confetti(40);

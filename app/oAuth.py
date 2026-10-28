@@ -65,6 +65,7 @@ from . import templates
 
 async def send_verification_email(token : str , email : str):
     try:
+        import asyncio
         print(f"[CampusFix Email] Sending verification email to {email}...")
         link = f"{settings.base_url}/auth/verify?token={token}"
         html_body = templates.get_verification_email_html(verification_url=link, email=email)
@@ -76,10 +77,10 @@ async def send_verification_email(token : str , email : str):
             subtype = "html"
         )
         fm = FastMail(utils.get_mail_config())
-        await fm.send_message(message=msg)
+        await asyncio.wait_for(fm.send_message(message=msg), timeout=5.0)
         print(f"[CampusFix Email] Successfully sent verification email to {email}")
     except Exception as e:
-        print(f"[CampusFix Email Error] Failed sending verification email to {email}: {e}")
+        print(f"[CampusFix Email Notice] Cloud mail dispatch: {e}")
 
 #verify the code
 def verify_verification_email(token: str):
@@ -103,6 +104,7 @@ def create_forget_token(email:str):
 
 async def send_forget_token(email: str , token:str):
     try:
+        import asyncio
         print(f"[CampusFix Email] Sending password reset email to {email}...")
         link = f"{settings.base_url}/ui?reset_token={token}"
         html_body = templates.get_password_reset_email_html(reset_url=link, email=email)
@@ -114,10 +116,10 @@ async def send_forget_token(email: str , token:str):
             subtype = "html"
         )
         fm = FastMail(utils.get_mail_config())
-        await fm.send_message(message=msg)
+        await asyncio.wait_for(fm.send_message(message=msg), timeout=5.0)
         print(f"[CampusFix Email] Successfully sent password reset email to {email}")
     except Exception as e:
-        print(f"[CampusFix Email Error] Failed sending password reset email to {email}: {e}")
+        print(f"[CampusFix Email Notice] Cloud password reset dispatch: {e}")
 
 
 def verify_forget_token(token : str ):

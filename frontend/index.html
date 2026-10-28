@@ -29,7 +29,11 @@
       <input name="email" id="loginEmail" type="email" required autocomplete="username" placeholder="e.g. 2203098@student.ruet.ac.bd">
       <div style="display:flex;justify-content:space-between;align-items:center;margin:14px 0 5px">
         <label style="margin:0">Password</label>
-        <button type="button" id="btnForgot" style="background:none;border:none;color:var(--acc2);font-size:12.5px;font-weight:700;cursor:pointer;padding:0">Forgot password?</button>
+        <div style="display:flex;gap:8px;align-items:center">
+          <button type="button" id="btnForgot" style="background:none;border:none;color:var(--acc2);font-size:12px;font-weight:700;cursor:pointer;padding:0">Forgot password?</button>
+          <span style="color:var(--mute);font-size:11px">·</span>
+          <button type="button" id="btnResendVerif" style="background:none;border:none;color:var(--acc);font-size:12px;font-weight:700;cursor:pointer;padding:0">Resend activation?</button>
+        </div>
       </div>
       <input name="password" type="password" required minlength="6" autocomplete="current-password">
       <div class="row"><button class="btn p" style="flex:1">Log in</button></div>

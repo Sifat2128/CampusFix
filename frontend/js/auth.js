@@ -68,6 +68,49 @@ function openForgotModal() {
   });
 }
 
+function openResendVerifModal() {
+  const prefill = $('#fLogin [name=email]') ? $('#fLogin [name=email]').value.trim() : '';
+  layer(`
+    <div class="modal" style="max-width:440px">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px">
+        <div style="width:48px;height:48px;border-radius:14px;background:rgba(124,92,255,0.12);border:1px solid rgba(124,92,255,0.3);display:flex;align-items:center;justify-content:center;font-size:22px">✉️</div>
+        <button type="button" class="btn" id="closeResendModal" style="padding:6px 12px;font-size:13px">✕</button>
+      </div>
+      <h2 style="margin:0 0 6px;font-size:20px;font-weight:800">Resend Activation Link</h2>
+      <p style="color:var(--mute);font-size:13.5px;line-height:1.5;margin:0 0 18px">
+        Didn't receive your verification email? Enter your email address and we will send a new activation link to your inbox.
+      </p>
+      <form id="fResend">
+        <label style="display:block;margin-bottom:6px;font-weight:600;font-size:13px">Account Email</label>
+        <input name="email" type="email" placeholder="e.g. 2203098@student.ruet.ac.bd" required value="${esc(prefill)}" style="width:100%;margin-bottom:18px">
+        <div class="row" style="margin:0;justify-content:flex-end;gap:10px">
+          <button type="button" class="btn" id="cancelResendBtn">Cancel</button>
+          <button class="btn p" style="background:linear-gradient(120deg,#7c5cff,#9d80ff);border:none;color:#fff;font-weight:700">Send Link</button>
+        </div>
+      </form>
+    </div>
+  `, 1);
+
+  $('#closeResendModal').onclick = closeLayer;
+  $('#cancelResendBtn').onclick = closeLayer;
+  $('#fResend').onsubmit = guard(async e => {
+    const email = new FormData(e.target).get('email').trim();
+    const res = await api('/auth/resend-verification?email=' + encodeURIComponent(email), { method: 'POST' });
+    toast(res.message || 'Verification link sent!');
+    layer(`
+      <div class="modal" style="text-align:center;max-width:440px">
+        <div style="width:68px;height:68px;margin:0 auto 16px;border-radius:50%;background:rgba(124,92,255,0.15);border:1.5px solid rgba(124,92,255,0.3);display:flex;align-items:center;justify-content:center;font-size:32px">📬</div>
+        <h2 style="margin:0 0 8px;font-size:20px;font-weight:800">Check Your Inbox</h2>
+        <p style="color:var(--mute);font-size:14px;line-height:1.6;margin:0 0 22px">
+          We sent a new activation link to <strong style="color:var(--ink)">${esc(email)}</strong>.<br>Please check your inbox or spam folder.
+        </p>
+        <button class="btn p" id="closeResendSuccess" style="width:100%">Got It</button>
+      </div>
+    `, 1);
+    $('#closeResendSuccess').onclick = closeLayer;
+  });
+}
+
 function checkResetToken() {
   const params = new URLSearchParams(location.search);
   const token = params.get('reset_token') || params.get('token');
@@ -183,6 +226,8 @@ function initAuth() {
   $('#tReg').onclick = () => { authTab(false); updateRoleGuide('reg'); };
   const forgotBtn = $('#btnForgot');
   if (forgotBtn) forgotBtn.onclick = openForgotModal;
+  const resendBtn = $('#btnResendVerif');
+  if (resendBtn) resendBtn.onclick = openResendVerifModal;
   checkResetToken();
 
   const regRole = $('#regRole');

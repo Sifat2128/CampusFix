@@ -142,3 +142,15 @@ def reset_password(token:str , new_password : schemas.ResetPassword , db:Session
     db.add(user)
     db.commit()
     return user
+
+@router.post("/resend-verification")
+def resend_verification(email: str, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+    user = db.query(models.User).filter(models.User.email == email.strip().lower()).first()
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No registered account found with this email.")
+    if user.is_verified:
+        return {"message": "Your account is already verified! You can log in directly."}
+    
+    token = oAuth.create_verification_token(user.email)
+    background_tasks.add_task(oAuth.send_verification_email, token, user.email)
+    return {"message": "A new verification link has been sent to your email. Please check your inbox and spam folder."}

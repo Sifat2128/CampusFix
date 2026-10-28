@@ -8,7 +8,7 @@ function show() {
   if (a) {
     $('#who').innerHTML = `${esc(S.email)} · <b>${esc(S.role)}</b>`;
     $('#av').textContent = S.email[0] || '?';
-    $('#newBtn').classList.toggle('hide', S.role !== 'student');
+    $('#newBtn').classList.toggle('hide', S.role === 'staff');
     refresh();
   }
 }
@@ -52,16 +52,25 @@ function openForgotModal() {
   $('#cancelForgotBtn').onclick = closeLayer;
   $('#fForgot').onsubmit = guard(async e => {
     const email = new FormData(e.target).get('email').trim();
-    await api('/auth/forget?email=' + encodeURIComponent(email), { method: 'POST' });
+    const forgotRes = await api('/auth/forget?email=' + encodeURIComponent(email), { method: 'POST' });
     toast('Password reset email sent!');
+    const directResetLink = forgotRes && forgotRes.reset_url ? forgotRes.reset_url : '';
+    const directResetBtn = directResetLink ? `
+      <div style="margin: 14px 0; padding: 12px; background: rgba(255,176,32,0.08); border-radius: 10px; border: 1px dashed rgba(255,176,32,0.4)">
+        <p style="font-size:12px;color:var(--mute);margin:0 0 8px">Cloud mail delayed? Reset directly:</p>
+        <a href="${directResetLink}" class="btn p" style="display:block;padding:9px 16px;text-decoration:none;font-size:13px;text-align:center;background:linear-gradient(120deg,#ff8008,#ffc837);color:#fff">🔑 Reset Password Now</a>
+      </div>
+    ` : '';
+
     layer(`
       <div class="modal" style="text-align:center;max-width:440px">
         <div style="width:68px;height:68px;margin:0 auto 16px;border-radius:50%;background:rgba(34,211,238,0.15);border:1.5px solid rgba(34,211,238,0.3);display:flex;align-items:center;justify-content:center;font-size:32px">📬</div>
         <h2 style="margin:0 0 8px;font-size:20px;font-weight:800">Check Your Inbox</h2>
-        <p style="color:var(--mute);font-size:14px;line-height:1.6;margin:0 0 22px">
+        <p style="color:var(--mute);font-size:14px;line-height:1.6;margin:0 0 16px">
           We sent a reset link to <strong style="color:var(--ink)">${esc(email)}</strong>.<br>Click the link in your email to choose a new password.
         </p>
-        <button class="btn p" id="closeForgotSuccess" style="width:100%">Back to Login</button>
+        ${directResetBtn}
+        <button class="btn" id="closeForgotSuccess" style="width:100%;margin-top:6px">Close</button>
       </div>
     `, 1);
     $('#closeForgotSuccess').onclick = closeLayer;
@@ -78,11 +87,11 @@ function openResendVerifModal() {
       </div>
       <h2 style="margin:0 0 6px;font-size:20px;font-weight:800">Resend Activation Link</h2>
       <p style="color:var(--mute);font-size:13.5px;line-height:1.5;margin:0 0 18px">
-        Didn't receive your verification email? Enter your email address and we will send a new activation link to your inbox.
+        Didn't receive your verification email? Enter your email address (students, teachers, or staff) and we will send a new activation link to your inbox.
       </p>
       <form id="fResend">
-        <label style="display:block;margin-bottom:6px;font-weight:600;font-size:13px">Account Email</label>
-        <input name="email" type="email" placeholder="e.g. 2203098@student.ruet.ac.bd" required value="${esc(prefill)}" style="width:100%;margin-bottom:18px">
+        <label style="display:block;margin-bottom:6px;font-weight:600;font-size:13px">Registered Institutional Email</label>
+        <input name="email" type="email" placeholder="e.g. 2203098@student.ruet.ac.bd or teacher@dept.ruet.ac.bd" required value="${esc(prefill)}" style="width:100%;margin-bottom:18px">
         <div class="row" style="margin:0;justify-content:flex-end;gap:10px">
           <button type="button" class="btn" id="cancelResendBtn">Cancel</button>
           <button class="btn p" style="background:linear-gradient(120deg,#7c5cff,#9d80ff);border:none;color:#fff;font-weight:700">Send Link</button>

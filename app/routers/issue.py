@@ -15,8 +15,6 @@ router = APIRouter(prefix="/issues", tags=["Issues"])
 
 @router.post("/create", response_model=schemas.CreateIssues, status_code=status.HTTP_201_CREATED)
 def create_issue(issues: schemas.CreateIssues, db: Session = Depends(get_db), current_user=Depends(oAuth.get_user)):
-    if current_user.role != models.UserRole.STUDENT:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=f"User with id {current_user.id} is not a student")
     staff = db.query(models.Staffs).order_by(models.Staffs.total_jobs.asc()).limit(1).first()
     if not staff:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Staff not found")
@@ -29,8 +27,8 @@ def create_issue(issues: schemas.CreateIssues, db: Session = Depends(get_db), cu
     db.add(issue)
     db.commit()
     db.refresh(issue)
-    db.add(models.AuditLog(action=f"{current_user.name} created issue", issue_id=issue.id, user_id=current_user.id))
-    db.add(models.AuditLog(action=f"Admin assigned issue to Staff #{staff.user_id} ({staff.name})", issue_id=issue.id, user_id=current_user.id))
+    db.add(models.AuditLog(action=f"{current_user.name} ({current_user.role}) created issue", issue_id=issue.id, user_id=current_user.id))
+    db.add(models.AuditLog(action=f"System assigned issue to Staff #{staff.user_id} ({staff.name})", issue_id=issue.id, user_id=current_user.id))
     db.commit()
     return issue
 
@@ -130,12 +128,12 @@ def close_issue(id: int, db: Session = Depends(get_db), current_user=Depends(oAu
     issue = db.query(models.Issue).filter(models.Issue.id == id).first()
     if not issue:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Issue with id {id} not found")
-    if current_user.role != models.UserRole.STUDENT or issue.user_id != current_user.id:
+    if current_user.role != models.UserRole.ADMIN and issue.user_id != current_user.id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You are not authorized to close this issue")
     if issue.status != models.Status.RESOLVED:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=f"Issue with id {id} is not resolved yet")
     issue.status = models.Status.CLOSED
-    db.add(models.AuditLog(action=f"{current_user.name} closed issue", issue_id=issue.id, user_id=current_user.id))
+    db.add(models.AuditLog(action=f"{current_user.name} ({current_user.role}) closed issue", issue_id=issue.id, user_id=current_user.id))
     db.add(issue)
     db.commit()
     db.refresh(issue)
@@ -147,10 +145,10 @@ def add_comment(id: int, comments: schemas.CreateComment, current_user=Depends(o
     issue = db.query(models.Issue).filter(models.Issue.id == id).first()
     if not issue:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Issue with id : {id} was not found")
-    allowed_roles = [models.UserRole.STUDENT, models.UserRole.STAFF, models.UserRole.ADMIN]
+    allowed_roles = [models.UserRole.STUDENT, models.UserRole.FACULTY, models.UserRole.STAFF, models.UserRole.ADMIN]
     if current_user.role not in allowed_roles:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You are not allowed to comment on this issue")
-    if issue.user_id != current_user.id and issue.assigned_employee_id != current_user.id:
+    if current_user.role != models.UserRole.ADMIN and issue.user_id != current_user.id and issue.assigned_employee_id != current_user.id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You are not authorized to add comment on this issue")
     comment = models.Comments(**comments.model_dump(), issue_id=issue.id, user_id=current_user.id)
     db.add(comment)
@@ -170,14 +168,13 @@ def get_comments(id: int, current_user=Depends(oAuth.get_user), db: Session = De
 
 @router.get("/{id}/history", response_model=List[schemas.AuditLog])
 def get_history(id: int, db: Session = Depends(get_db), current_user=Depends(oAuth.get_user)):
-    # FIX: was [ADMIN, STAFF]; students (owner only) and admins may view history.
-    permitted_roles = [models.UserRole.ADMIN, models.UserRole.STUDENT]
+    permitted_roles = [models.UserRole.ADMIN, models.UserRole.STUDENT, models.UserRole.FACULTY, models.UserRole.STAFF]
     issue = db.query(models.Issue).filter(models.Issue.id == id).first()
     if not issue:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Issue with id : {id} is not found")
     if current_user.role not in permitted_roles:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You are not authorized to view history")
-    if current_user.role == models.UserRole.STUDENT and issue.user_id != current_user.id:
+    if current_user.role not in [models.UserRole.ADMIN, models.UserRole.STAFF] and issue.user_id != current_user.id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You are not authorized to view history")
     return (db.query(models.AuditLog).filter(models.AuditLog.issue_id == issue.id)
             .order_by(models.AuditLog.time.desc()).all())
@@ -188,8 +185,8 @@ def vote(id: int, vote: schemas.CreateVote, current_user=Depends(oAuth.get_user)
     issue = db.query(models.Issue).filter(models.Issue.id == id).first()
     if not issue:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Issue with id : {id} is not found")
-    if current_user.role != models.UserRole.STUDENT:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You are not authorized to vote on this issue")
+    if current_user.role == models.UserRole.STAFF:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Staff assigned to work on issues cannot vote")
 
     existing = db.query(models.Votes).filter(models.Votes.issue_id == issue.id,
                                              models.Votes.user_id == current_user.id).first()
@@ -209,8 +206,6 @@ def voted(id: int, current_user=Depends(oAuth.get_user), db: Session = Depends(g
     issue = db.query(models.Issue).filter(models.Issue.id == id).first()
     if not issue:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Issue with id : {id} is not found")
-    if current_user.role != models.UserRole.STUDENT:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You are not authorized to vote on this issue")
     mine = db.query(models.Votes).filter(models.Votes.issue_id == issue.id,
                                          models.Votes.user_id == current_user.id).first()
     total = db.query(models.Votes).filter(models.Votes.issue_id == issue.id).count()

@@ -28,7 +28,7 @@ async function loadList() {
     const r = await api('/issues/?' + p);
     r.data.forEach(i => S.cache[i.id] = i);
     $('#list').innerHTML = r.data.length ? r.data.map(card).join('')
-      : `<div class="empty">No issues match these filters.${S.role === 'student' ? ' Use “Report an issue” to add one.' : ''}</div>`;
+      : `<div class="empty">No issues match these filters.${S.role !== 'staff' ? ' Use “Report an issue” to add one.' : ''}</div>`;
     document.querySelectorAll('.issue').forEach(c => c.onclick = () => openIssue(c.dataset.id));
     const end = Math.min(S.skip + S.limit, r.total);
     $('#pinfo').textContent = r.total ? `${S.skip + 1}–${end} of ${r.total}` : '0 results';

@@ -117,12 +117,13 @@ def reset_redirect(token: str = ""):
 
 @router.post("/forget")
 def forget(email:str ,background_tasks : BackgroundTasks , db:Session = Depends(get_db)):
-    user = db.query(models.User).filter(models.User.email == email).first()
+    user = db.query(models.User).filter(models.User.email == email.strip().lower()).first()
     if not user:
       return Response(status_code=status.HTTP_200_OK , content = "The user is not found")
-    token = oAuth.create_forget_token(email)
-    background_tasks.add_task(oAuth.send_forget_token , email , token)
-    return {"message" : "Forget Token Sent"}
+    token = oAuth.create_forget_token(user.email)
+    background_tasks.add_task(oAuth.send_forget_token , user.email , token)
+    reset_url = f"{settings.base_url}/ui?reset_token={token}"
+    return {"message" : "Forget Token Sent", "reset_url": reset_url}
 
 # @router.post("/verify-forget-token")
 # def verify_forget_token(token:str , db:Session = Depends(get_db)):

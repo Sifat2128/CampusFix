@@ -9,9 +9,9 @@ class IssueService:
         permitted_for_studs = ["title","description","category","priority"] #
         if not issue:
            raise HTTPException(status_code = status.HTTP_404_NOT_FOUND,detail = f"Issue with id {issue_id} not found")
-        if current_user.role != models.UserRole.ADMIN and current_user.role != models.UserRole.STUDENT:
+        if current_user.role != models.UserRole.ADMIN and issue.user_id != current_user.id:
             raise HTTPException(status_code = status.HTTP_403_FORBIDDEN,detail = f"User with id {current_user.id} is not authorized to access this issue")
-        if current_user.role == models.UserRole.STUDENT and issue.status != models.Status.OPEN:
+        if current_user.role != models.UserRole.ADMIN and issue.status != models.Status.OPEN:
            raise HTTPException(status_code = status.HTTP_403_FORBIDDEN , detail = "The issue is already on process to be fixed")
     
         updated_data = update_issue.model_dump(exclude_unset = True)

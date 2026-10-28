@@ -75,7 +75,7 @@ async def send_verification_email(token : str , email : str):
             body = html_body,
             subtype = "html"
         )
-        fm = FastMail(utils.confg)
+        fm = FastMail(utils.get_mail_config())
         await fm.send_message(message=msg)
         print(f"[CampusFix Email] Successfully sent verification email to {email}")
     except Exception as e:
@@ -113,7 +113,7 @@ async def send_forget_token(email: str , token:str):
             body = html_body,
             subtype = "html"
         )
-        fm = FastMail(utils.confg)
+        fm = FastMail(utils.get_mail_config())
         await fm.send_message(message=msg)
         print(f"[CampusFix Email] Successfully sent password reset email to {email}")
     except Exception as e:

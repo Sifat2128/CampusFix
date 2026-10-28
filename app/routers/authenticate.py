@@ -154,3 +154,46 @@ def resend_verification(email: str, background_tasks: BackgroundTasks, db: Sessi
     token = oAuth.create_verification_token(user.email)
     background_tasks.add_task(oAuth.send_verification_email, token, user.email)
     return {"message": "A new verification link has been sent to your email. Please check your inbox and spam folder."}
+
+@router.get("/diagnose-email")
+async def diagnose_email(to: str = ""):
+    target_email = to.strip() or settings.mail_from or settings.admin_one
+    info = {
+        "mail_server": settings.mail_server,
+        "mail_port": settings.mail_port,
+        "mail_username": settings.mail_username,
+        "mail_from": settings.mail_from,
+        "is_password_configured": bool(settings.mail_password and len(settings.mail_password) > 0),
+        "target_email": target_email,
+    }
+    
+    if not settings.mail_username or not settings.mail_password:
+        return {
+            "status": "error",
+            "reason": "Missing MAIL_USERNAME or MAIL_PASSWORD in Render Environment Variables",
+            "diagnostics": info,
+            "solution": "Go to Render Dashboard -> Environment tab and set MAIL_USERNAME and MAIL_PASSWORD (16-character Google App Password)."
+        }
+        
+    try:
+        from fastapi_mail import MessageSchema, FastMail
+        msg = MessageSchema(
+            subject="CampusFix SMTP Diagnostic Test",
+            recipients=[target_email],
+            body="If you received this message, CampusFix email delivery is working properly on Render!",
+            subtype="plain"
+        )
+        fm = FastMail(utils.get_mail_config())
+        await fm.send_message(message=msg)
+        return {
+            "status": "success",
+            "message": f"Diagnostic email successfully delivered to {target_email}!",
+            "diagnostics": info
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "exception_type": type(e).__name__,
+            "error_detail": str(e),
+            "diagnostics": info
+        }

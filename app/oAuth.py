@@ -63,7 +63,7 @@ from fastapi_mail import MessageSchema,MessageType,FastMail
 from . import templates
 
 async def send_verification_email(token : str , email : str):
-    link = f"http://localhost:8000/auth/verify?token={token}"
+    link = f"{settings.base_url}/auth/verify?token={token}"
     html_body = templates.get_verification_email_html(verification_url=link, email=email)
     
     msg = MessageSchema(
@@ -96,7 +96,7 @@ def create_forget_token(email:str):
     return token
 
 async def send_forget_token(email: str , token:str):
-    link = f"http://localhost:8000/ui?reset_token={token}"
+    link = f"{settings.base_url}/ui?reset_token={token}"
     html_body = templates.get_password_reset_email_html(reset_url=link, email=email)
     
     msg = MessageSchema(

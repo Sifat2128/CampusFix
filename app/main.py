@@ -44,14 +44,11 @@ app.include_router(authenticate.router)
 app.include_router(issue.router)
 app.include_router(chat.router)
 
+from fastapi.responses import RedirectResponse
+
 @app.get("/")
 def get():
-    return {
-        "message": "CampusFix API is running",
-        "docs": "/docs",
-        "frontend": "/ui",
-        "status": "online"
-    }
+    return RedirectResponse(url="/ui")
 
 @app.get("/health")
 def health():

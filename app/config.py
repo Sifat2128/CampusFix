@@ -1,3 +1,4 @@
+import os
 from typing import Optional
 from pydantic import EmailStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -25,6 +26,16 @@ class Settings(BaseSettings):
     
     cors_origins: str = "*"
     environment: str = "development"
+    app_url: Optional[str] = None
+    
+    @property
+    def base_url(self) -> str:
+        if self.app_url:
+            return self.app_url.rstrip("/")
+        render_url = os.getenv("RENDER_EXTERNAL_URL")
+        if render_url:
+            return render_url.rstrip("/")
+        return "http://localhost:8000"
     
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

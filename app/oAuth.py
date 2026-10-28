@@ -3,6 +3,7 @@ from fastapi import HTTPException,status,Depends
 from sqlalchemy.orm import Session 
 from . database import get_db
 from . import models,schemas,utils,config 
+from .config import settings
 from datetime import datetime,timedelta,UTC
 import jwt 
 from jwt import InvalidTokenError
@@ -63,17 +64,22 @@ from fastapi_mail import MessageSchema,MessageType,FastMail
 from . import templates
 
 async def send_verification_email(token : str , email : str):
-    link = f"{settings.base_url}/auth/verify?token={token}"
-    html_body = templates.get_verification_email_html(verification_url=link, email=email)
-    
-    msg = MessageSchema(
-        subject = "Verify your CampusFix account",
-        recipients = [email],
-        body = html_body,
-        subtype = "html"
-    )
-    fm = FastMail(utils.confg)
-    await fm.send_message(message=msg)
+    try:
+        print(f"[CampusFix Email] Sending verification email to {email}...")
+        link = f"{settings.base_url}/auth/verify?token={token}"
+        html_body = templates.get_verification_email_html(verification_url=link, email=email)
+        
+        msg = MessageSchema(
+            subject = "Verify your CampusFix account",
+            recipients = [email],
+            body = html_body,
+            subtype = "html"
+        )
+        fm = FastMail(utils.confg)
+        await fm.send_message(message=msg)
+        print(f"[CampusFix Email] Successfully sent verification email to {email}")
+    except Exception as e:
+        print(f"[CampusFix Email Error] Failed sending verification email to {email}: {e}")
 
 #verify the code
 def verify_verification_email(token: str):
@@ -96,17 +102,22 @@ def create_forget_token(email:str):
     return token
 
 async def send_forget_token(email: str , token:str):
-    link = f"{settings.base_url}/ui?reset_token={token}"
-    html_body = templates.get_password_reset_email_html(reset_url=link, email=email)
-    
-    msg = MessageSchema(
-        subject = "Reset your CampusFix password",
-        recipients = [email],
-        body = html_body,
-        subtype = "html"
-    )
-    fm = FastMail(utils.confg)
-    await fm.send_message(message=msg)
+    try:
+        print(f"[CampusFix Email] Sending password reset email to {email}...")
+        link = f"{settings.base_url}/ui?reset_token={token}"
+        html_body = templates.get_password_reset_email_html(reset_url=link, email=email)
+        
+        msg = MessageSchema(
+            subject = "Reset your CampusFix password",
+            recipients = [email],
+            body = html_body,
+            subtype = "html"
+        )
+        fm = FastMail(utils.confg)
+        await fm.send_message(message=msg)
+        print(f"[CampusFix Email] Successfully sent password reset email to {email}")
+    except Exception as e:
+        print(f"[CampusFix Email Error] Failed sending password reset email to {email}: {e}")
 
 
 def verify_forget_token(token : str ):

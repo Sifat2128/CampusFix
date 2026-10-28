@@ -13,7 +13,7 @@ async function api(path, { method = 'GET', json, form } = {}) {
     const d = data?.detail;
     const err = new Error(typeof d === 'string' ? d
       : Array.isArray(d) ? d.map(e => e.loc.slice(1).join('.') + ': ' + e.msg).join('; ')
-      : 'Request failed (' + r.status + ')');
+        : 'Request failed (' + r.status + ')');
     err.status = r.status;
     throw err;
   }

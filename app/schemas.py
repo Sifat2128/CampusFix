@@ -2,7 +2,7 @@ from typing import Optional, Literal,List, Generic, TypeVar
 from pydantic import BaseModel,ConfigDict,EmailStr,Field
 from datetime import datetime
 from .models import UserRole,Status,Category,Priority
-
+from . import models
 class CreateUser(BaseModel):
     name:str 
     email:EmailStr 
@@ -15,6 +15,7 @@ class GetUser(BaseModel):
     name:str 
     role:UserRole
     created_at:datetime
+    is_verified:bool = False
     model_config = ConfigDict(from_attributes=True)
 class TokenId(BaseModel):
     user_id:int 
@@ -27,6 +28,7 @@ class TokenResponse(BaseModel):
 class UserLogin(BaseModel):
     email:EmailStr
     password:str = Field(min_length=6,max_length=72)
+    role:str 
     model_config = ConfigDict(from_attributes=True)
 
 class CreateIssues(BaseModel):
@@ -76,6 +78,7 @@ class GetVotes(BaseModel):
     user_id : int 
     issue_id: int
     total_votes:int 
+    voted: bool = False
     created_at : datetime  
     model_config = ConfigDict(from_attributes = True)
 
@@ -95,4 +98,16 @@ class AuditLog(BaseModel):
     user_id:int 
     action:str
     model_config = ConfigDict(from_attributes=True)
-    
+
+class ResetPassword(BaseModel):
+    password : str = Field(min_length=6, max_length=72)
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ChatRequest(BaseModel):
+    message: str = Field(min_length=1, max_length=1000)
+
+class ChatResponse(BaseModel):
+    answer: str
+    tool_used: Optional[str] = None
+    model_config = ConfigDict(from_attributes=True)

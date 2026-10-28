@@ -26,3 +26,8 @@ def require_admin(db:Session,current_user =  Depends(oAuth.get_user)):
     if role != models.UserRole.ADMIN:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,detail="Not Authorized")
     return True
+
+def require_verified(db:Session,current_user =  Depends(oAuth.get_user)):
+    if not current_user.is_verified:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,detail="Not Authorized")
+    return True

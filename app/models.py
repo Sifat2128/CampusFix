@@ -2,7 +2,7 @@ from collections import Counter
 from sqlalchemy import ColumnElement
 from sqlalchemy import null
 import enum
-from sqlalchemy import Column, String, Integer, Float, TIMESTAMP, Enum, ForeignKey, text,UniqueConstraint,ForeignKeyConstraint,CheckConstraint
+from sqlalchemy import Column, String, Integer, Float, TIMESTAMP, Enum, ForeignKey, text,UniqueConstraint,ForeignKeyConstraint,CheckConstraint,Boolean
 from sqlalchemy.orm import relationship
 from .database import engine, Base
 
@@ -40,8 +40,9 @@ class User(Base):
     id = Column(Integer, primary_key=True, nullable=False)
     name = Column(String, nullable=False)
     email = Column(String, nullable=False, unique=True)
-    password = Column(String, nullable=False, unique=True)
+    password = Column(String, nullable=False)
     role = Column(Enum(UserRole, name="user_role"), nullable=False)
+    is_verified = Column(Boolean, nullable=False, server_default='false')
     created_at = Column(TIMESTAMP, nullable=False, server_default=text('now()'))
     __table_args__ = (
     UniqueConstraint('id', 'role', name='uq_user_id_role'),

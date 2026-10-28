@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>CampusFix</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/style.css?v=5">
 </head>
 <body>
 
@@ -23,16 +23,27 @@
   <div class="formwrap"><div class="panel">
     <div class="tabs"><button id="tLogin" class="on">Log in</button><button id="tReg">Create account</button></div>
     <form id="fLogin">
-      <label>Email</label><input name="email" type="email" required autocomplete="username">
-      <label>Password</label><input name="password" type="password" required minlength="6" autocomplete="current-password">
-      <label>I am a</label><select name="role"><option>student</option><option>staff</option><option>faculty</option><option>admin</option></select>
+      <label>I am a</label>
+      <select name="role" id="loginRole"><option value="student">student</option><option value="faculty">faculty</option><option value="staff">staff</option><option value="admin">admin</option></select>
+      <label>Email <span id="loginEmailHint" style="font-size:11.5px;color:var(--mute);font-weight:normal"></span></label>
+      <input name="email" id="loginEmail" type="email" required autocomplete="username" placeholder="e.g. 2203098@student.ruet.ac.bd">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin:14px 0 5px">
+        <label style="margin:0">Password</label>
+        <button type="button" id="btnForgot" style="background:none;border:none;color:var(--acc2);font-size:12.5px;font-weight:700;cursor:pointer;padding:0">Forgot password?</button>
+      </div>
+      <input name="password" type="password" required minlength="6" autocomplete="current-password">
       <div class="row"><button class="btn p" style="flex:1">Log in</button></div>
     </form>
     <form id="fReg" class="hide">
-      <label>Full name</label><input name="name" required>
-      <label>Email</label><input name="email" type="email" required>
+      <label>Full name</label><input name="name" required placeholder="e.g. Sifat Hasan">
+      <label>Role</label>
+      <select name="role" id="regRole"><option value="student">student</option><option value="faculty">faculty</option><option value="staff">staff</option><option value="admin">admin</option></select>
+      <label>Institutional Email <span id="regEmailHint" style="font-size:11.5px;color:var(--acc);font-weight:600"></span></label>
+      <input name="email" id="regEmail" type="email" required placeholder="e.g. 2203098@student.ruet.ac.bd">
+      <div id="emailGuideBox" style="font-size:12px;color:var(--mute);background:rgba(124,92,255,0.06);padding:8px 12px;border-radius:8px;margin-bottom:12px;border:1px solid rgba(124,92,255,0.15);line-height:1.4">
+        🎓 <strong>RUET Students:</strong> Email must contain <code>student</code> and <code>ruet</code> (e.g., <em>2203098@student.ruet.ac.bd</em>)
+      </div>
       <label>Password (6-72 characters)</label><input name="password" type="password" required minlength="6" maxlength="72">
-      <label>Role</label><select name="role"><option>student</option><option>staff</option><option>faculty</option><option>admin</option></select>
       <div class="row"><button class="btn p" style="flex:1">Create account</button></div>
     </form>
   </div></div>
@@ -60,13 +71,58 @@
 
 <div id="layer"></div><div id="toasts"></div>
 
+<!-- Floating AI Assistant Button -->
+<button id="aiFab" class="ai-fab hide" aria-label="Open CampusFix AI Assistant">
+  <span class="ai-fab-icon">✨</span>
+  <span class="ai-fab-text">CampusFix AI</span>
+  <span class="ai-fab-badge"></span>
+</button>
+
+<!-- Floating AI Chat Window -->
+<div id="aiChatPanel" class="ai-chat-panel hide">
+  <div class="ai-chat-header">
+    <div class="ai-chat-header-info">
+      <div class="ai-avatar">🤖</div>
+      <div>
+        <div class="ai-title">CampusFix AI</div>
+        <div class="ai-status"><span class="ai-dot"></span> Online &bull; DB Connected</div>
+      </div>
+    </div>
+    <div class="ai-header-actions">
+      <button id="aiClearBtn" class="ai-icon-btn" title="Reset chat history">&#8635;</button>
+      <button id="aiCloseBtn" class="ai-icon-btn" title="Close chat">&#10005;</button>
+    </div>
+  </div>
+  
+  <div id="aiMessages" class="ai-messages"></div>
+
+  <div class="ai-suggestions" id="aiSuggestions">
+    <button class="ai-chip" data-q="How many unresolved issues are there?">⚠️ Unresolved count</button>
+    <button class="ai-chip" data-q="Give me an overview of issues">📊 System overview</button>
+    <button class="ai-chip" data-q="Show my reported issues">📋 My reported issues</button>
+    <button class="ai-chip" data-q="What are the recent issues?">🔍 Recent issues</button>
+    <button class="ai-chip" data-q="What are the details of issue #1?">🎯 Issue #1 info</button>
+  </div>
+
+  <form id="aiForm" class="ai-input-form">
+    <input id="aiInput" type="text" placeholder="Ask about campus issues, stats, or ID #..." autocomplete="off" maxlength="500">
+    <button type="submit" id="aiSendBtn" class="ai-send-btn" aria-label="Send message">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="22" y1="2" x2="11" y2="13"></line>
+        <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+      </svg>
+    </button>
+  </form>
+</div>
+
 <!-- Classic scripts, loaded in order (no ES modules, so no MIME-type surprises) -->
-<script src="js/config.js"></script>
-<script src="js/ui.js"></script>
-<script src="js/api.js"></script>
-<script src="js/auth.js"></script>
-<script src="js/detail.js"></script>
-<script src="js/issues.js"></script>
-<script src="js/main.js"></script>
+<script src="js/config.js?v=5"></script>
+<script src="js/ui.js?v=5"></script>
+<script src="js/api.js?v=5"></script>
+<script src="js/auth.js?v=5"></script>
+<script src="js/detail.js?v=5"></script>
+<script src="js/issues.js?v=5"></script>
+<script src="js/chatbot.js?v=5"></script>
+<script src="js/main.js?v=5"></script>
 </body>
 </html>

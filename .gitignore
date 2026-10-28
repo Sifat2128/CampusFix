@@ -1,0 +1,36 @@
+# Environment variables & secrets (CRITICAL: NEVER COMMIT)
+.env
+.env.*
+*.env
+!.env.example
+
+# Python Virtual Environments
+.venv/
+venv/
+env/
+ENV/
+
+# Python Bytecode & Cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyc
+
+# Pytest & Test Artifacts
+.pytest_cache/
+.coverage
+htmlcov/
+_test_*.py
+_browser_*.py
+_chrome_profile*/
+
+# OS & IDE Files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Logs
+*.log

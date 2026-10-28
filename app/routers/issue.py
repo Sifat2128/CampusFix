@@ -9,6 +9,7 @@ from .. import models, schemas, oAuth
 from ..database import get_db
 from ..services.issue_service import issue_serv
 
+
 router = APIRouter(prefix="/issues", tags=["Issues"])
 
 
@@ -194,11 +195,13 @@ def vote(id: int, vote: schemas.CreateVote, current_user=Depends(oAuth.get_user)
                                              models.Votes.user_id == current_user.id).first()
     if existing:                       # toggle: vote again to remove your vote
         db.delete(existing)
+        is_voted = False
     else:
         db.add(models.Votes(issue_id=issue.id, user_id=current_user.id))
+        is_voted = True
     db.commit()
     total = db.query(models.Votes).filter(models.Votes.issue_id == issue.id).count()
-    return {"user_id": current_user.id, "issue_id": issue.id, "total_votes": total, "created_at": datetime.now(UTC)}
+    return {"user_id": current_user.id, "issue_id": issue.id, "total_votes": total, "voted": is_voted, "created_at": datetime.now(UTC)}
 
 
 @router.get("/{id}/vote", response_model=schemas.GetVotes)
@@ -208,9 +211,10 @@ def voted(id: int, current_user=Depends(oAuth.get_user), db: Session = Depends(g
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Issue with id : {id} is not found")
     if current_user.role != models.UserRole.STUDENT:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You are not authorized to vote on this issue")
-    # FIX: filter by the current user, and always return the total (even when it is 0)
     mine = db.query(models.Votes).filter(models.Votes.issue_id == issue.id,
                                          models.Votes.user_id == current_user.id).first()
     total = db.query(models.Votes).filter(models.Votes.issue_id == issue.id).count()
-    return {"user_id": current_user.id, "issue_id": issue.id, "total_votes": total,
+    return {"user_id": current_user.id, "issue_id": issue.id, "total_votes": total, "voted": bool(mine),
             "created_at": mine.created_at if mine else datetime.now(UTC)}
+            
+

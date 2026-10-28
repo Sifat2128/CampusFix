@@ -30,7 +30,7 @@ function renderDetail(i, cm, hist, vote) {
     ? `<p class="mute">This issue belongs to someone else, so you can read it but not comment.</p>`
     : `<form id="fc" style="margin-top:12px"><textarea name="content" placeholder="Write a comment" required style="min-height:70px"></textarea><div class="row"><button class="btn p">Post comment</button></div></form>`;
   const d = layer(`<aside class="drawer">
-   <div style="display:flex;justify-content:space-between;gap:8px"><span class="chip s-${i.status}">${label(i.status)}</span><button class="btn" id="x">Close</button></div>
+   <div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><span class="chip s-${i.status}" style="display:inline-flex;align-items:center;justify-content:center;height:26px;padding:0 12px;line-height:1;border-radius:999px;box-sizing:border-box">${label(i.status)}</span><button class="btn" id="x">Close</button></div>
    <h2 style="margin:10px 0 4px">${esc(i.title)}</h2>
    <div class="pipe">${STAT.map(([k, l], n) => `<div style="--n:${n}" class="${n <= idx ? 'done' : ''}">${l}</div>`).join('')}</div>
    <p style="white-space:pre-wrap">${esc(i.description)}</p>
@@ -46,16 +46,19 @@ function renderDetail(i, cm, hist, vote) {
   $('#x').onclick = closeLayer;
 
   if (r === 'student') {
-    let voted = vote ? (vote.voted ?? true) : false, total = vote ? vote.total_votes : null;
+    let voted = !!vote?.voted, total = vote ? (vote.total_votes ?? 0) : 0;
     const paint = () => {
       $('#vote').className = 'btn' + (voted ? ' p' : '');
       $('#vote').textContent = voted ? '✓ Same problem here' : 'Same problem here';
-      $('#vc').textContent = total == null ? '' : `${total} ${total === 1 ? 'student has' : 'students have'} this problem`;
+      $('#vc').textContent = `${total} ${total === 1 ? 'student has' : 'students have'} this problem`;
     };
     paint();
     $('#vote').onclick = guard(async () => {
       const res = await api(`/issues/${i.id}/vote`, { method: 'POST', json: { like: 1 } }); // endpoint toggles
-      voted = res.voted ?? !voted; total = res.total_votes; paint(); if (voted) confetti(30);
+      voted = !!res.voted;
+      total = res.total_votes;
+      paint();
+      if (voted) confetti(30);
     });
   }
 

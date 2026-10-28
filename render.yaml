@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: campusfix-backend
+    env: docker
+    plan: free
+    region: oregon
+    dockerfilePath: Dockerfile
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: CORS_ORIGINS
+        value: "*"
+      - key: ACCESS_TOKEN_EXPIRE_MINUTES
+        value: "60"
+      - key: ALGORITHM
+        value: "HS256"
+      # Set DATABASE_URL and SECRET_KEY in Render Dashboard Secrets:
+      # - key: DATABASE_URL
+      #   sync: false
+      # - key: SECRET_KEY
+      #   generateValue: true

@@ -1,8 +1,8 @@
 const $ = s => document.querySelector(s);
-const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const label = s => String(s).replace('_',' ');
-const fmt = d => new Date(/Z|[+-]\d\d:?\d\d$/.test(d) ? d : d + 'Z').toLocaleString([], {dateStyle:'medium', timeStyle:'short'});
-const opts = (arr, sel) => arr.map(v => `<option value="${v}"${v===sel?' selected':''}>${label(v)}</option>`).join('');
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const label = s => String(s).replace('_', ' ');
+const fmt = d => new Date(/Z|[+-]\d\d:?\d\d$/.test(d) ? d : d + 'Z').toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
+const opts = (arr, sel) => arr.map(v => `<option value="${v}"${v === sel ? ' selected' : ''}>${label(v)}</option>`).join('');
 
 function toast(m, err) {
   const t = document.createElement('div');
@@ -14,7 +14,7 @@ function toast(m, err) {
 function closeLayer() { $('#layer').innerHTML = ''; }
 function layer(html, mid) {
   const l = $('#layer');
-  l.innerHTML = `<div class="scrim${mid?' mid':''}">${html}</div>`;
+  l.innerHTML = `<div class="scrim${mid ? ' mid' : ''}">${html}</div>`;
   const s = l.firstChild;
   s.onclick = e => { if (e.target === s) closeLayer(); };
   return s;
@@ -27,7 +27,7 @@ const guard = fn => async e => {
   try { await fn(e); } catch (x) { toast(x.message, 1); } finally { if (b) b.disabled = false; }
 };
 
-const CONF = ['#7c5cff','#22d3ee','#a3e635','#fb7185','#fbbf24'];
+const CONF = ['#7c5cff', '#22d3ee', '#a3e635', '#fb7185', '#fbbf24'];
 function confetti(n = 70) {
   for (let k = 0; k < n; k++) {
     const p = document.createElement('i'); p.className = 'cf';

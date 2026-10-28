@@ -42,3 +42,80 @@ def get_user(db:Session = Depends(get_db),token : str = Depends(oAuthScheme)):
     user_id = token_id.user_id
     user = db.query(models.User).filter(models.User.id == user_id).first()
     return user
+
+def require_verification(current_user: models.User = Depends(get_user)):
+    if not current_user.is_verified:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Email verification required to perform this action"
+        )
+    return current_user
+
+
+#create function for verification of signing up 
+
+def create_verification_token(email:str , db: Session = Depends(get_db)):
+    payload = {"email" : email , "exp" :  datetime.now(UTC)+timedelta(hours = 24) ,"access_type" : "verification"}
+    token = jwt.encode(payload , algorithm=ALGORITHM , key = SECRET_KEY)
+    return token 
+
+from fastapi_mail import MessageSchema,MessageType,FastMail
+from . import templates
+
+async def send_verification_email(token : str , email : str):
+    link = f"http://localhost:8000/auth/verify?token={token}"
+    html_body = templates.get_verification_email_html(verification_url=link, email=email)
+    
+    msg = MessageSchema(
+        subject = "Verify your CampusFix account",
+        recipients = [email],
+        body = html_body,
+        subtype = "html"
+    )
+    fm = FastMail(utils.confg)
+    await fm.send_message(message=msg)
+
+#verify the code
+def verify_verification_email(token: str):
+    try:
+        decoded = jwt.decode(token, algorithms=[ALGORITHM], key=SECRET_KEY)
+        email = decoded.get("email")
+        if decoded.get("access_type") != "verification" or not email:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid Token")
+        return email
+    except InvalidTokenError:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid Token")
+
+
+
+
+#creating token and verifying and sending for forgetting email 
+def create_forget_token(email:str):
+    payload = {"email" : email , "exp" :  datetime.now(UTC)+timedelta(hours = 24) , "type" : "forget"}
+    token = jwt.encode(payload , algorithm=ALGORITHM , key = SECRET_KEY)
+    return token
+
+async def send_forget_token(email: str , token:str):
+    link = f"http://localhost:8000/ui?reset_token={token}"
+    html_body = templates.get_password_reset_email_html(reset_url=link, email=email)
+    
+    msg = MessageSchema(
+        subject = "Reset your CampusFix password",
+        recipients = [email],
+        body = html_body,
+        subtype = "html"
+    )
+    fm = FastMail(utils.confg)
+    await fm.send_message(message=msg)
+
+
+def verify_forget_token(token : str ):
+    try:
+        decoded = jwt.decode(token , algorithms=[ALGORITHM] , key = SECRET_KEY)
+        email = decoded.get("email")
+        type = decoded.get("type")
+        if type != "forget":
+            raise HTTPException(status_code = status.HTTP_401_UNAUTHORIZED , detail = "Invalid User")
+        return email
+    except InvalidTokenError:
+        raise HTTPException(status_code = status.HTTP_401_UNAUTHORIZED , detail = "Invalid Token")

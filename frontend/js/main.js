@@ -1,4 +1,10 @@
 initAuth();
 initIssues();
-document.addEventListener('keydown', e => { if (e.key === 'Escape') closeLayer(); });
+initChatbot();
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    closeLayer();
+    if (typeof closeAiChat === 'function') closeAiChat();
+  }
+});
 show();

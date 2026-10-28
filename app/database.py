@@ -4,9 +4,11 @@ from sqlalchemy.orm import sessionmaker, declarative_base
 from .config import settings
 
 if settings.database_url:
-    url = settings.database_url
+    url = settings.database_url.strip()
     if url.startswith("postgres://"):
-        url = url.replace("postgres://", "postgresql://", 1)
+        url = url.replace("postgres://", "postgresql+psycopg2://", 1)
+    elif url.startswith("postgresql://") and not url.startswith("postgresql+"):
+        url = url.replace("postgresql://", "postgresql+psycopg2://", 1)
     SQL_URL = url
 else:
     password = urllib.parse.quote_plus(settings.database_password or "")
